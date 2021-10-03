@@ -66,10 +66,11 @@ while(True):
             detected_emotions = set()
             tic = time.time()
 
-        if (toc - tic) > time_threshold or len(detected_emotions) == len(emotion_labels) or no_face_found_frames > frame_threshold:
+        runtime = toc - tic
+        if runtime > time_threshold or len(detected_emotions) == len(emotion_labels) or no_face_found_frames > frame_threshold:
             # Time is up, all emotions detected or no face seen for x frames 
             # Show game stats
-            print("Player got %d emotions in %0.3f seconds" % (len(detected_emotions), toc - tic))
+            print("Player got %d emotions in %0.3f seconds" % (len(detected_emotions), runtime))
             playing = False
             show_stats = True
         else:
@@ -85,7 +86,7 @@ while(True):
                 no_face_found_frames += 1
                                 
             # Time left for detecting emotions
-            time_left = int(time_threshold - (toc - tic) + 1)
+            time_left = int(time_threshold - runtime + 1)
             cv2.rectangle(img, (10, 10), (90, 50), (67,67,67), -10)
             cv2.putText(img, str(time_left), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
 
