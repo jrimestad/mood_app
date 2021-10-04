@@ -5,9 +5,11 @@ author: jens.rimestad@gmail.com
 
 import cv2
 from deepface import DeepFace
+from deepface.detectors import FaceDetector
 from deepface.commons import functions
 import PIL.Image as Image
 import time
+import numpy as np
 
 # Define global variables
 emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']    
@@ -15,7 +17,7 @@ model_name = 'VGG-Face'
 detector_backend = 'opencv'
 face_detector = FaceDetector.build_model(detector_backend)
 
-time_threshold = 30
+time_threshold = 30000
 frame_threshold = 5
 input_shape = (224, 224); input_shape_x = input_shape[0]; input_shape_y = input_shape[1]
 text_color = (255,255,255)
@@ -28,6 +30,7 @@ cap = cv2.VideoCapture(source) #webcam
 playing = False
 show_stats = True
 no_face_found_frames = 0
+emotion_thresh = 0.5
 face_detected = False
 tic = time.time()
 toc = tic
@@ -40,8 +43,8 @@ while(True):
         time_used = toc - tic
         cv2.putText(img, str(time_used), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
         cv2.putText(img, str("Detected %d emotions." % (len(detected_emotions))), (40, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
-        cv2.putText(img, str("Press 's' to start.", (40, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
-        cv2.imshow(img)
+        cv2.putText(img, str("Press 's' to start."), (40, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
+        cv2.imshow('img', img)
     else:
         resolution = img.shape; resolution_x = img.shape[1]; resolution_y = img.shape[0]
 
@@ -81,7 +84,7 @@ while(True):
                 emotion_predictions = emotion_model.predict(gray_img)[0,:]
                 max_emotion = np.argmax(emotion_predictions)
                 if emotion_predictions[max_emotion] >= emotion_thresh:
-                    detected_emotions.append(max_emotion)
+                    detected_emotions.add(max_emotion)
             else:
                 no_face_found_frames += 1
                                 
