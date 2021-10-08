@@ -12,8 +12,8 @@ import time
 import numpy as np
 
 # Define global variables
-emotion_labels = ['Angry', 'Disgust', 'Fear', 'Happy', 'Sad', 'Surprise', 'Neutral']    
-model_name = 'VGG-Face'
+emotion_labels = ['ANGRY', 'DISGUST', 'FEAR', 'HAPPY', 'SAD', 'SURPRISE', 'NEUTRAL']    
+model_name = 'OpenFace'#'VGG-Face'
 detector_backend = 'opencv'
 face_detector = FaceDetector.build_model(detector_backend)
 
@@ -32,11 +32,15 @@ cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 playing = False
 show_stats = True
 no_face_found_frames = 0
-emotion_thresh = 0.5
+emotion_thresh = [0.5, 0.25, 0.5, 0.6, 0.4, 0.6, 0.35]
 face_detected = False
 tic = time.time()
 toc = tic
 detected_emotions = set()
+text_space = 80
+barwidth = 270
+bar_offset = 15
+bar_height = 4
 
 cv2.namedWindow('img',cv2.WINDOW_NORMAL)
 # cv2.resizeWindow('img', 600,600)
@@ -45,9 +49,8 @@ while(True):
 
     if show_stats:
         time_used = toc - tic
-        cv2.putText(img, str(time_used), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
-        cv2.putText(img, str("Detected %d emotions." % (len(detected_emotions))), (40, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
-        cv2.putText(img, str("Press 's' to start."), (40, 140), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
+        cv2.putText(img, "Detected %d emotions in %0.0f seconds." % (len(detected_emotions), time_used), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
+        cv2.putText(img, "Press space-bar to start.", (40, 90), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
         cv2.imshow('img', img)
     else:
         resolution = img.shape; resolution_x = img.shape[1]; resolution_y = img.shape[0]
@@ -55,24 +58,34 @@ while(True):
         faces = FaceDetector.detect_faces(face_detector, detector_backend, img, align = False)
 
         # Find largest face
-        max_face = 50
+        max_face = 200
         detected_face = None
         face_detected = False
+        max_face_dims = np.array([0,0,0,0])
         for face, (x, y, w, h) in faces:
-            if w > max_face:
-                max_face = w
+            y -= int(h * 0.05)
+            y = np.clip(y, 0, resolution_y)
+            h += int(h * 0.1)
+            
+            if w * h > max_face:
+                max_face = w * h
                 face_detected = True
-                cv2.rectangle(img, (x,y), (x+w,y+h), (67,67,67), 1) #draw rectangle to main image
-                detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face
+                max_face_dims = np.array([x, y, w, h])
+                # detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face
 
-        if face_detected and playing==False:
-            # Start game
-            playing = True
-            show_stats = False
-            no_face_found_frames = 0
-            detected_emotions = set()
-            tic = time.time()
+        if face_detected:
+            detected_face = img[int(max_face_dims[1]):int(max_face_dims[1]+max_face_dims[3]), int(max_face_dims[0]):int(max_face_dims[0]+max_face_dims[2])] #crop detected face
+            cv2.rectangle(img, max_face_dims[0:2], max_face_dims[0:2] + max_face_dims[2:4], (180,180,180), 1) #draw rectangle to main image
+            if playing==False:
+                # Start game
+                playing = True
+                show_stats = False
+                no_face_found_frames = 0
+                emotion_predictions = np.zeros((7), np.float)
+                detected_emotions = set()
+                tic = time.time()
 
+        toc = time.time()
         runtime = toc - tic
         if runtime > time_threshold or len(detected_emotions) == len(emotion_labels) or no_face_found_frames > frame_threshold:
             # Time is up, all emotions detected or no face seen for x frames 
@@ -85,31 +98,35 @@ while(True):
                 # Look for emotions in detected face
                 no_face_found_frames = 0
                 gray_img = functions.preprocess_face(img = detected_face, target_size = (48, 48), grayscale = True, enforce_detection = False, detector_backend = 'opencv')		
-                emotion_predictions = emotion_model.predict(gray_img)[0,:]
-                max_emotion = np.argmax(emotion_predictions)
-                if emotion_predictions[max_emotion] >= emotion_thresh:
-                    detected_emotions.add(max_emotion)
+                emotion_predictions = 0.85 * emotion_predictions + 0.15 * emotion_model.predict(gray_img)[0,:]
+                # max_emotion = np.argmax(emotion_predictions)
+                if any(emotion_predictions > emotion_thresh):
+                # if emotion_predictions[max_emotion] >= emotion_thresh:
+                    detected_emotions.add(np.argmax(emotion_predictions > emotion_thresh))
             else:
                 no_face_found_frames += 1
                                 
             # Time left for detecting emotions
             time_left = int(time_threshold - runtime + 1)
-            cv2.rectangle(img, (10, 10), (90, 50), (67,67,67), -10)
-            cv2.putText(img, str(time_left), (40, 40), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 1)
+            cv2.rectangle(img, (20, 20), (370, resolution_y - 20), (67,67,67), -10)
+            cv2.putText(img, "TIME:%ds" % (time_left), (40, 85), cv2.FONT_HERSHEY_SIMPLEX, 2, (255, 255, 255), 1)
 
             # Show emotion status
             for i, emotion in enumerate(emotion_labels):
                 detected = i in detected_emotions
-                cv2.putText(img, str(emotion), (40, (i + 2) * 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected else (0, 0, 255))
+                cv2.putText(img, str(emotion), (40, (i + 2) * text_space), cv2.FONT_HERSHEY_SIMPLEX, 2, (0, 255, 0) if detected else (0, 0, 255))
+                cv2.line(img, (40, (i + 2) * text_space + bar_offset), (40 + barwidth, (i + 2) * text_space + bar_offset), (255, 255, 255), bar_height)
+                cv2.line(img, (40, (i + 2) * text_space + bar_offset), (int(40 + min(1.0, emotion_predictions[i] / emotion_thresh[i]) * barwidth), (i + 2) * text_space + bar_offset), (0, emotion_predictions[i] * 255, 0), bar_height)
 
         cv2.imshow('img',img)
-        toc = time.time()
 
-    if cv2.waitKey(1) & 0xFF == ord('q'): #press q to quit
-        break
-
-    if cv2.waitKey(1) & 0xFF == ord('s'): #start game
-        show_stats = False
+    key = cv2.waitKey(1)
+    if key:
+        if key & 0xFF == ord('q'): #press q to quit
+            break
+        if key & 0xFF == ord(' '): #start game
+            show_stats = False
+        
 
 #kill open cv things
 cap.release()
