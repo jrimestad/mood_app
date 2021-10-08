@@ -17,15 +17,17 @@ model_name = 'VGG-Face'
 detector_backend = 'opencv'
 face_detector = FaceDetector.build_model(detector_backend)
 
-time_threshold = 30000
-frame_threshold = 5
+time_threshold = 30
+frame_threshold = 60
 input_shape = (224, 224); input_shape_x = input_shape[0]; input_shape_y = input_shape[1]
 text_color = (255,255,255)
 
 # Init model and webcam
 emotion_model = DeepFace.build_model('Emotion')
 source = 0 # Webcam to use
-cap = cv2.VideoCapture(source) #webcam
+cap = cv2.VideoCapture(source, cv2.CAP_DSHOW) #webcam
+cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
+cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
 
 playing = False
 show_stats = True
@@ -36,6 +38,8 @@ tic = time.time()
 toc = tic
 detected_emotions = set()
 
+cv2.namedWindow('img',cv2.WINDOW_NORMAL)
+# cv2.resizeWindow('img', 600,600)
 while(True):
     ret, img = cap.read()
 
@@ -51,7 +55,7 @@ while(True):
         faces = FaceDetector.detect_faces(face_detector, detector_backend, img, align = False)
 
         # Find largest face
-        max_face = 130
+        max_face = 50
         detected_face = None
         face_detected = False
         for face, (x, y, w, h) in faces:
@@ -61,7 +65,7 @@ while(True):
                 cv2.rectangle(img, (x,y), (x+w,y+h), (67,67,67), 1) #draw rectangle to main image
                 detected_face = img[int(y):int(y+h), int(x):int(x+w)] #crop detected face
 
-        if face_detected and ~playing:
+        if face_detected and playing==False:
             # Start game
             playing = True
             show_stats = False
@@ -96,7 +100,7 @@ while(True):
             # Show emotion status
             for i, emotion in enumerate(emotion_labels):
                 detected = i in detected_emotions
-                cv2.putText(img, str(emotion), (40, (i + 2) * 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected else (255, 0, 0))
+                cv2.putText(img, str(emotion), (40, (i + 2) * 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0) if detected else (0, 0, 255))
 
         cv2.imshow('img',img)
         toc = time.time()
