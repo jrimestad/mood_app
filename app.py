@@ -11,6 +11,31 @@ import PIL.Image as Image
 import time
 import numpy as np
 
+def overlay_image_alpha(img, img_overlay, x, y, alpha_mask):
+    """Overlay `img_overlay` onto `img` at (x, y) and blend using `alpha_mask`.
+
+    `alpha_mask` must have same HxW as `img_overlay` and values in range [0, 1].
+    """
+    # Image ranges
+    y1, y2 = max(0, y), min(img.shape[0], y + img_overlay.shape[0])
+    x1, x2 = max(0, x), min(img.shape[1], x + img_overlay.shape[1])
+
+    # Overlay ranges
+    y1o, y2o = max(0, -y), min(img_overlay.shape[0], img.shape[0] - y)
+    x1o, x2o = max(0, -x), min(img_overlay.shape[1], img.shape[1] - x)
+
+    # Exit if nothing to do
+    if y1 >= y2 or x1 >= x2 or y1o >= y2o or x1o >= x2o:
+        return
+
+    # Blend overlay within the determined ranges
+    img_crop = img[y1:y2, x1:x2]
+    img_overlay_crop = img_overlay[y1o:y2o, x1o:x2o]
+    alpha = alpha_mask[y1o:y2o, x1o:x2o, np.newaxis]
+    alpha_inv = 1.0 - alpha
+
+    img_crop[:] = alpha * img_overlay_crop + alpha_inv * img_crop
+
 # Define global variables
 emotion_labels = ['ANGRY', 'DISGUST', 'FEAR', 'HAPPY', 'SAD', 'SURPRISE', 'NEUTRAL']    
 model_name = 'OpenFace'#'VGG-Face'
@@ -41,11 +66,14 @@ text_space = 80
 barwidth = 270
 bar_offset = 15
 bar_height = 4
+logo_img = Image.open("logo.png").resize((200, 200))
+emotion_predictions = np.zeros((7), np.float)
 
 cv2.namedWindow('img',cv2.WINDOW_NORMAL)
 # cv2.resizeWindow('img', 600,600)
 while(True):
     ret, img = cap.read()
+    img = cv2.flip(img, flipCode=1)
 
     if show_stats:
         time_used = toc - tic
@@ -118,6 +146,7 @@ while(True):
                 cv2.line(img, (40, (i + 2) * text_space + bar_offset), (40 + barwidth, (i + 2) * text_space + bar_offset), (255, 255, 255), bar_height)
                 cv2.line(img, (40, (i + 2) * text_space + bar_offset), (int(40 + min(1.0, emotion_predictions[i] / emotion_thresh[i]) * barwidth), (i + 2) * text_space + bar_offset), (0, emotion_predictions[i] * 255, 0), bar_height)
 
+        # img = overlay_image_alpha(img, logo_img, resolution_x - 200, 40, np.array(logo_img)[:,:,0] / 255)
         cv2.imshow('img',img)
 
     key = cv2.waitKey(1)
